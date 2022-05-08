@@ -1,0 +1,133 @@
+<!DOCTYPE HTML> 
+<html lang="en"> 
+<head>
+<title>MP6: Shading for Technical Illustration</title>
+<meta charset="utf-8"> 
+</head>
+
+<!-- If you add additional .js files, be sure to add them here. -->
+<script src="gl-matrix-min.js"></script>
+<script src="TriMesh.js"></script>
+<script src="MP6.js"></script>
+
+<!-- MP2: Modify the shaders to implement Phong shading instead of Gourand! -->
+<script id="shader-vs" type="x-shader/x-vertex">#version 300 es
+// Vertex Shader
+// Implements Phong shading. See the lecture on "Basic Shading" for details.
+
+// Use high-precision floats if available on this device.
+#ifdef GL_FRAGMENT_PRECISION_HIGH
+precision highp float;
+#else
+precision mediump float;
+#endif
+
+in vec3 vertexPosition;
+in vec3 vertexNormal;
+
+uniform mat4 modelViewMatrix;
+uniform mat4 projectionMatrix;
+uniform mat3 normalMatrix;
+
+uniform vec3 kAmbient;
+uniform vec3 kDiffuse;
+uniform vec3 kSpecular;
+uniform float shininess;
+uniform int gooch;
+
+uniform vec3 lightPosition;
+uniform vec3 ambientLightColor;
+uniform vec3 diffuseLightColor;
+uniform vec3 specularLightColor;
+
+out vec4 vertexColor;
+
+
+void main(void) {
+    // Transform the vertex position and normal to view coordinates
+    vec3 vertexPositionView = (modelViewMatrix * vec4(vertexPosition, 1.0)).xyz;
+    vec3 vertexNormalView = normalize(normalMatrix * vertexNormal);
+
+    // The camera is at the origin in view coordinates
+    vec3 cameraPositionView = vec3(0.0, 0.0, 0.0);
+
+    // Calculate the three other vectors we need: l, r, and v
+    vec3 lightVector = normalize(lightPosition - vertexPositionView);
+    vec3 reflectionVector = normalize(reflect(-lightVector, vertexNormalView));
+    vec3 viewVector = normalize(cameraPositionView - vertexPositionView);
+
+    // Calculate diffuse light weighting: (n dot l)
+    float diffuseWeight = max(dot(vertexNormalView, lightVector), 0.0);
+    
+    // Calculate the specular light weighting: (r dot v)^(shininess)
+    float rDotV = max(dot(reflectionVector, viewVector), 0.0);
+    float specularWeight = pow(rDotV, shininess);
+
+    // Sum up all three lighting components into the color for the vertex,
+    // and send it to the fragment shader.
+    vertexColor = vec4((  kAmbient * ambientLightColor
+                        + kDiffuse * diffuseLightColor * diffuseWeight
+                        + kSpecular * specularLightColor * specularWeight), 1.0);
+    
+    if (gooch == 1) {
+        if (dot(vertexNormalView, viewVector) < 0.18)
+            vertexColor = vec4(0.0, 0.0, 0.0, 1.0);
+        else {
+            vec4 kCool = vec4(0.0, 0.0, 0.55, 1.0) + 0.25 * vec4(kDiffuse, 1.0);
+            vec4 kWarm = vec4(0.55, 0.55, 0.0, 1.0) + 0.65 * vec4(kDiffuse, 1.0);
+            float t = (1.0 + dot(lightVector, vertexNormalView)) / 2.0;
+            vertexColor = t * kCool + (1.0 - t) * kWarm 
+                            + 0.6 * vec4(kSpecular * specularLightColor * specularWeight, 1.0);
+        }                    
+    }
+    gl_Position =
+        projectionMatrix * modelViewMatrix * vec4(vertexPosition, 1.0);
+}
+</script>
+
+<!-- MP2: Modify the shaders to implement Phong shading instead of Gourand! -->
+<script id="shader-fs" type="x-shader/x-fragment">#version 300 es
+// Fragment Shader
+// Implements Phong shading. See the lecture on "Basic Shading" for details.
+
+// Use high-precision floats if available on this device.
+#ifdef GL_FRAGMENT_PRECISION_HIGH
+precision highp float;
+#else
+precision mediump float;
+#endif
+
+in vec4 vertexColor;
+out vec4 fragmentColor;
+
+
+void main(void) {
+    // Interpolate the computed vertex color for each fragment.
+    fragmentColor = vertexColor;
+}
+</script>
+
+
+<body onload="startup();">
+    <canvas id="glCanvas" width="1200" height="600"></canvas>
+
+    <form id="input_form">
+        <fieldset>
+            <legend>Rendering Options</legend>
+            <div>
+                <input type="radio" name="primitive" id="wireframe" value="wireframe"> Wireframe
+                <input type="radio" name="primitive" id="polygon" value="polygon" checked> Polygon
+                <input type="radio" name="primitive" id="wirepoly" value="wirepoly" > Polygon with Edges
+            </div>
+        </fieldset>
+        <fieldset>
+            <legend>Shading Options</legend>
+            <div>
+                <input type="checkbox" id="gooch" name="gooch" checked>
+                <label for="gooch">Enable Gooch Shading</label>
+            </div>
+        </fieldset>  
+    </form>
+</body>
+
+</html>
